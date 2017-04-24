@@ -1,0 +1,445 @@
+HEROES OF THE STORM - Análise de partidas de Janeiro/Fevereiro 
+
+por CAIO VASCONCELOS DE SOUZA
+========================================================
+
+##Sinopse
+
+Em um jogo do estilo MOBA vários fatores podem influenciar uma vitória/derrota, Existe algum fator determinante? um jogador bom pode carregar um time ruim? Uma formação de herois
+é mais vitoriosa? O time que mais vence é aquele que tem o numero de jogadores com maior habilidade? Vamos Descobrir investigando este dataset.
+
+##Notas de Introdução
+
+O Dataset Original é disponibilizado pelo site www.hotslogs.com , os dados não são oficiais da Blizzard(Detentora dos direitos do Heroes Of the Storm) e suas informações vem de replays de partidas disponibilizadas por jogadores. O dataset original contém dados de replays no período de Janeiro com 23 milhões de observações, por ser um dataset longo com aproximadamente 1.7GB foi necessário trabalhar com um dataset menor. Como o dataset contém informações de todos os tipos de modos de jogo(Partida Rápida, Drafts Não-Ranqueados. Liga de equipes) resolvi filtrar para analisar apenas partidas da liga heroica pelos seguintes motivos:
+
+1 - As Equipes são montadas de forma mais coerente do que partida rápida(equipes não são formadas de maneira aleatória)
+
+2 - Jogadores tendem a levar partidas de liga heroica mais a sério(Hipótese)
+
+3 - Não tem tantos registros quanto partida Rápida mas não tão poucos como Liga de equipes
+
+
+
+## Dataset
+
+#Preparação
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+# Carregue aqui todos os pacotes utilizados 
+# na sua análise realizada neste arquivo fonte.
+
+# Note que o parâmetro "echo" foi definido como FALSE neste código.
+# Isso previne que o código apresente resultados formatados em HTML.
+# Você deve definir echo=FALSE para todos os blocos de código no seu arquivo.
+
+library(ggplot2)
+library(GGally)
+library(ggthemes)
+library(gridExtra)
+library(scales)
+library(dplyr)
+library(psych)
+library(chron)
+```
+
+
+```{r}
+#Funções úteis
+
+numeric.corr.test <- function(x){
+  numeric <- sapply(x, is.numeric)
+  corr.test(x[ , numeric])
+  
+}
+```
+
+
+```{r echo=FALSE,message=FALSE,warning=FALSE}
+setwd("/Users/caiodesouza/Downloads/HOTSLogs_Data")
+
+repl_heroic <- read.csv("heroic_league.csv")
+replay <- read.csv("Replays.csv")
+heroID_mapID <- read.csv("HeroIDAndMapID.csv")
+
+#Transformando Dados, Removendo Valores NA para 0, Damage Taken é medido somente para herois do tipo 'Warrior', assim como Healing só é medido com hérois do tipo 'Support'
+repl_heroic$ReplayID <- factor(repl_heroic$ReplayID)
+repl_heroic$HeroID <- factor(repl_heroic$HeroID)
+repl_heroic$Is.Winner <- factor(repl_heroic$Is.Winner)
+
+repl_heroic$Healing[is.na(repl_heroic$Healing)] <- 0
+repl_heroic$Damage.Taken[is.na(repl_heroic$Damage.Taken)] <- 0
+
+#Transformando Time
+repl_heroic$Time.Spent.Dead <- chron(times=repl_heroic$Time.Spent.Dead)
+
+#Transformando também "replay", usaremos mais tarde, não precisaremos de GameMode, pois todas as partidas são de liga heroica.
+replay$ReplayID <- factor(replay$ReplayID)
+replay$GameMode.3.Quick.Match.4.Hero.League.5.Team.League.6.Unranked.Draft. <- NULL
+
+#
+heroID_mapID$ID <- factor(heroID_mapID$ID)
+```
+
+
+## Sumário do Dataset
+
+```{r echo=FALSE,message=FALSE,warning=FALSE}
+   summary(repl_heroic)
+   
+
+```
+
+Podemos ver que há mais limpeza a ser feita, Ninguém que joga na Liga heróica usa o
+Auto-Select(Seleção aleatória de Heróis). Além esta coluna podemos identificar algumas colunas interessantes:
+
+- Hero.Level: Nível de herói do Jogador(de 1 a 20), teoricamente quanto maior o nível do herói mais experiência o jogador tem com ele, iremos verificar isso mais tarde. Não confundir esta variável com In.Game.Level no qual indica o nível do heroi na partida(No qual o nível é igual ao nível geral da equipe)
+
+- Is.Winner: Variavel que indica se o registro foi de Vitória ou derrota, esta é a variável que iremos verificar toda correlação que possa influenciar nesta variavel.
+
+- MMR.Before: MMR significa Matchmaking Ranking, é um índice de habilidade do jogador calculado a cada partida, isto segundo o HOTSLogs. Vêmos um mínimo com MMR Negativo no qual inicialmente é estranho(Acredito que ninguém possa ser TÃO RUIM ASSIM), mas como a formula que calcula este índice não é revelada iremos assumir que o índice está próximo da realidade.
+
+O Restante das variáveis são explanatórias por si.
+
+```{r echo=FALSE,message=FALSE,warning=FALSE}
+   #Removendo colunas Desnecessárias
+   repl_heroic$Is.Auto.Select <- NULL
+   repl_heroic$X <- NULL
+```
+
+
+## O Que está levando os jogadores a vitória?
+
+Vamos verificar a correlação de todo o dataset com a variável "Is.Winner" para descobrir se existe algum fator importante que determine a vitória
+```{r}
+
+```
+
+
+```{r echo=FALSE,message=FALSE,warning=FALSE}
+
+setwd("/Users/caiodesouza/Downloads")
+#Nos Interessa apenas variáveis Numéricas, vamos analisar um subset com 100000 Registros
+set.seed(424242)
+repl_subset <- subset(repl_heroic, select = -c(ReplayID ,HeroID, Time.Spent.Dead))
+repl_subset$Is.Winner <- factor(repl_subset$Is.Winner)
+#theme_set(theme_minimal(4))
+ggpairs(repl_subset[sample.int(nrow(repl_subset), 10000), ],upper = list(
+    continuous = wrap("cor", size = 3, alignPercent = 1)), lower = list(
+    continuous = wrap("cor", size = 3, alignPercent = 1)), axisLabels="none", cardinality_threshold = 100)
+
+#numeric <- sapply(repl_heroic, is.numeric)
+#corr.test(repl_heroic[ , numeric])
+  
+```
+
+Os Valores de correlação que mais se aproximaram de 1 em relação a variável "Is.Winner" foram Takedowns, Assists e Highest.Kill.Streak com valores de 0.56, 0.52 e 0.54 respectivamente, Indicando uma relação moderada, quanto mais Abates e Assistências em Abates teoricamente é maior a probabilidade de vitória, incrivelmente a variável MMR.Before NÃO TEM CORRELAÇÃO com vitória/Derrota, indicando que a vitória independente do nível de habilidade, isso deve ser verificado mais a fundo, vamos fazer um estudo sobre a variável MMR.Before.
+
+
+# Estudo do MMR
+
+
+```{r echo=FALSE,message=FALSE,warning=FALSE}
+#Plotando Porcentagem de MMR
+
+ggplot(repl_heroic,aes(x=MMR.Before)) + 
+  geom_histogram(aes(y = ..count.. / 1000), binwidth = 50, colour = "Black", fill = I("#4c4cff")) +
+  xlab("MMR (Matchmaking Ranking)") +
+  ylab("Quantidade de Registros (Em Milhares)") +
+  theme_bw() + 
+  scale_x_continuous(limits = c(0, 4000), breaks = seq(0,4000,200)) 
+#+ scale_y_continuous(labels = percent)
+
+```
+
+
+O Gráfico faz total sentido visto que no sumário temos uma mediana bem próxima da Média: 
+
+Median :2145 ,Mean   :2154
+
+Segundo o site www.hotslogs.com o Jogador da Liga Mestre(a mais alta desconsiderando profissionais do e-sport) tem um mínimo de MMR de 2666, então podemos considerar que o "jogador padrão" de Heroes of the Storm está nas ligas intermediárias, Vamos verificar se nas ligas mais altas vamos obter estatísticas melhores.
+
+```{r}
+   repl.High.MMR <- subset(repl_heroic,MMR.Before > 2666)
+   summary(repl.High.MMR)
+```
+
+#Pouca Diferença entre Partidas de MMR Alto e MMR padrão. Isto nos leva a uma hipótese de que o MMR Individual realmente não interfira na qualidade e decisão das partidas. Todas estas estatísticas e correlações nos remetem a dados individuais dos jogadores e podemos ver que a correlação mais forte aqui é Takedown(Abates) com assists(Assistência) com uma correlação fortissima de 0.92, se a medida que o número de abates sobe o número de assistências sobem de forma muito proxima é lógico pensar que este é um indicativo forte que "HOTS É UM JOGO DE EQUIPE", logo faria mais sentido analisar os replays por equipe do que por jogador individual.
+
+
+## Organizando Dataset por equipes
+
+```{r echo=FALSE,message=FALSE,warning=FALSE}
+
+#Agrupando por Replay e Por vencedor/Perdedor, logo após atribuimos caracteristicas de Interesse para uma analise por equipe como média de MMR, somatório de Abates, Curas etc..
+
+
+
+repl_heroic.Team <- repl_heroic %>% 
+  group_by(ReplayID,Is.Winner) %>% 
+  dplyr::summarise(MMR.mean = mean(MMR.Before),
+                   highest_MMR = max(MMR.Before),
+                   lowest_MMR = min(MMR.Before),
+                   team_xp = sum(Experience.Contribution),
+                   mercs = sum(Merc.Camp.Captures),
+                   team_kills = sum(Takedowns),
+                   team_deaths = sum(Deaths),
+                   team_heal = sum(Healing),
+                   team_hero_damage = sum(Hero.Damage),
+                   team_siege_damage = sum(Siege.Damage),
+                   team_time_dead = sum(Time.Spent.Dead),
+                   Hero1 = list(as.integer(HeroID))[[1]][1],
+                   Hero2 = list(as.integer(HeroID))[[1]][2],
+                   Hero3 = list(as.integer(HeroID))[[1]][3],
+                   Hero4 = list(as.integer(HeroID))[[1]][4],
+                   Hero5 = list(as.integer(HeroID))[[1]][5]
+                   )
+
+#numeric.corr.test(repl_heroic.Team)
+#excluindo MMR pois já vimos que não tem muita correlação confirmado com o código acima numeric.corr.test
+repl_heroic.Team_subset <- subset(repl_heroic.Team, select = -c(ReplayID, Hero1, Hero2, Hero3, Hero4, Hero5,team_time_dead))
+repl_heroic.Team_subset$Is.Winner <- factor(repl_heroic.Team_subset$Is.Winner)
+ggpairs(repl_heroic.Team_subset[sample.int(nrow(repl_heroic.Team_subset), 10000), ],columns = c("Is.Winner","team_siege_damage","team_kills","team_xp","team_deaths") ,cardinality_threshold = 100)
+
+
+```
+
+Correlação moderada entre Vitória(Is.Winner) e numero de abates da equipe(team_kills) e correlação negativa moderada entre vitória e mortes da equipe(team_deaths), se você quiser vencer a resposta óbvia é: mate muito e morra pouco. Além disto o numero de abates tem forte correlação com a experiência adquirida(team_xp) o que é interessante analisar que a medida que se abate o time inimigo a experiência do time sobe alcançando leveis mais altos(Se tivessemos dados sobre o tempo em que os abates foram realizados na partida talvez poderiamos analisar um possível 'efeito bola de neve' onde poderemos ver se é possível 'virar o jogo' mesmo após um numero de abates alto pela equipe adversária)
+
+
+#Analisando Herois E fatores que levam a vitória
+
+Nesta seção vamos analisar agora quais Herois mais contribuem com experiência, Abates e experiência para a equipe, voltaremos a utilizar o dataset por replay individual.
+
+Vamos precisar do dataset "heroID_mapID" para adquirir o Nome do Heroi ao invés do seu ID.
+```{r}
+  #Fazendo Join entre tabelas
+
+  repl_heroic.heroID.Joined <- left_join(repl_heroic,heroID_mapID, by = c("HeroID" = "ID"))
+  
+  repl_heroic.heroID.Joined.Summarise <- repl_heroic.heroID.Joined %>% group_by(Name) %>% summarise(Healing.Mean = mean(Healing),
+                                                               Healing.Median = median(Healing),
+                                                               Damage.Mean  = mean(Hero.Damage),
+                                                               Damage.Median = median(Hero.Damage),
+                                                               Exp.Mean     = mean(Experience.Contribution),
+                                                               Exp.Median   = median(Experience.Contribution),
+                                                               Tank.Mean    = mean(Damage.Taken),
+                                                               Tank.Median  = median(Damage.Taken)
+                                                               )
+```
+
+
+```{r}
+  #Herois com maior team_xp
+  ggplot(repl_heroic.heroID.Joined, aes(x=Name, y=Experience.Contribution, fill = Group)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 90))
+  
+```
+```{r}
+#Herois com maior hero damage
+ggplot(repl_heroic.heroID.Joined, aes(x=Name, y=Hero.Damage, fill = Group)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 90))
+```
+Ficou um pouco complicado de verificar quem realmente tinha o melhor hero damage, deu para ter uma boa noção entre Gall, Chromie, Li-Ming e Kael'thas, mas vamos plotar em outro gráfico para poder tirar a dúvida
+
+```{r}
+
+ggplot(subset(repl_heroic.heroID.Joined, Group == "Assassin"), aes(x=Name, y=Hero.Damage, fill = SubGroup)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 90)) + coord_cartesian(ylim = c(10000,65000))
+```
+
+Agora Podemos ver que o Gall está um pouco a frente.
+
+```{r}
+
+#Pesquisando os melhores Suportes
+ggplot(subset(repl_heroic.heroID.Joined,Healing > 1 & ((SubGroup == "Support") | (SubGroup == "Healer"))), aes(x=Name, y=Healing, fill = Group)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 90))
+```
+
+
+Vamos tentar montar um time dos sonhos, Será que um time com o melhor héroi em Hero Damage,  e Melhor Contribuição de experiência teria um índice de vitórias altas?
+
+```{r}
+
+  #Tive que retirar o fator "Melhor Cura"" por simplesmente não existir uma equipe com o héroi com melhor dano, melhor experiencia e melhor cura, então procurei por melhor dano e experiência
+  dream.team <- subset(repl_heroic.Team, 
+                                               
+                                                (45 == repl_heroic.Team$Hero1 |
+                                                45 == repl_heroic.Team$Hero2 |
+                                                45 == repl_heroic.Team$Hero3 |
+                                                45 == repl_heroic.Team$Hero4 |
+                                                45 == repl_heroic.Team$Hero5) &
+                                                (32 == repl_heroic.Team$Hero1 |
+                                                32 == repl_heroic.Team$Hero2 |
+                                                32 == repl_heroic.Team$Hero3 |
+                                                32 == repl_heroic.Team$Hero4 |
+                                                32 == repl_heroic.Team$Hero5))  
+
+
+summary(dream.team$Is.Winner)
+                                                  
+                       
+
+```
+
+Apenas 5 partidas e 3 vitórias, parece que esse não é um fator determinante para a formação das equipes, não basta juntar as melhores estatísticas, parece-me que a 'Coesão da equipe é mais importante do que os índices', vamos tentar analisar a o indice de sinergia de acordo com o site: heroescounters.com, foi necessário realizar um screen scraping para obter um arquivo csv contendo a sinergia de um herói com todos os outros(de acordo com os votos de jogadores), o código responsável pelo screen scraping é o "heroesCounterScraper.py"
+
+```{r}
+
+#Sinergia entre dois Herois
+Synergy_Between <- function(dataset,x,y){
+  ret <- as.numeric(synergie_df[which(synergie_df[,"HeroID"] == x & synergie_df[,"Synergie.With"] == y), "Points"])
+  if(length(ret) == 0){
+    return (numeric(1))
+  }
+  return(ret)
+  
+}
+
+#Calcula a Sinergia de uma equipe de acordo com a formula do HeroesCounters.com
+Team_Synergy <- function(Hero1,Hero2,Hero3,Hero4,Hero5){
+  #print(paste("team",Hero1,Hero2,Hero3,Hero4,Hero5))
+  ret <- (Synergy_Between(synergy_df, x = Hero1, y=Hero2) + 
+    
+                                          ((Synergy_Between(synergy_df,x = Hero3, y=Hero1) +
+                                          Synergy_Between(synergy_df,x=Hero3, y=Hero2)) / 2.0) +
+                                          
+                                          ((Synergy_Between(synergy_df,x=Hero4, y=Hero1) + 
+                                          Synergy_Between(synergy_df,x=Hero4, y=Hero2) +
+                                          Synergy_Between(synergy_df,x=Hero4, y=Hero3)) / 3.0) +
+                                          
+                                          ((Synergy_Between(synergy_df,x=Hero5, y=Hero1) +
+                                          Synergy_Between(synergy_df,x=Hero5, y=Hero2) +
+                                          Synergy_Between(synergy_df,x=Hero5, y=Hero3) +
+                                          Synergy_Between(synergy_df,x=Hero5, y=Hero4)) / 4.0))
+  
+ 
+  return(ret)
+}
+
+
+
+
+
+setwd("/Users/caiodesouza/Downloads/HOTSLogs_data")
+synergy_df <- read.csv("synergy.csv")
+
+#Nova coluna: Sinergia da equipe
+repl_heroic.Team$Synergy <- apply(subset(repl_heroic.Team,select = c("Hero1","Hero2","Hero3","Hero4", "Hero5")), 1, function(x) do.call(Team_Synergy,as.list(x)))
+
+#Testando correlacão de sinergia com vitória
+cor.test(as.integer(repl_heroic.Team$Is.Winner), repl_heroic.Team$Synergy)
+
+
+
+#repl_heroic.Team$synergy <- Calculate_Synergy(repl_heroic.Team$team_heroes)
+#repl_heroic.Team$synergy <- apply(repl_heroic.Team,1,FUN = function(x) ) #by(synergy_df, 1:nrow(synergy_df), Calculate_Synergy(repl_heroic.Team$team_heroes))#
+```
+
+Correlação fraca de sinergia da equipe com Indice de Vitória, isso indica a hipótese que **Não basta uma equipe coesa** Algo mais é necessário para para alcançar a vitória, isso pode acontecer devido ao fato de que as equipes montam seus times com a maior sinergia possível sempre, logo a diferença entre Sinergia é pouca, pelo código abaixo podemos verificar que a diferença de sinergia entre equipes vencedoras e perdedoras são bem poucas comparada com o número de partidas totais
+```{r}
+Winner <- subset(repl_heroic.Team, Is.Winner == 1)
+Loser <- subset(repl_heroic.Team, Is.Winner == 0)
+
+Winner_high_synergy_diff <-  Winner[Winner$Synergy - Loser$Synergy > 150, ]
+
+dim(Winner_high_synergy_diff)
+```
+
+#Analise de Herois Individuais
+
+Nesta Seção vamos estudar alguns aspectos de herois individuais relacionados com os jogadores
+
+```{r}
+repl_heroic$HeroID <- as.factor(repl_heroic$HeroID)
+repl_heroic.heroID.Group <- repl_heroic %>% group_by(HeroID) %>% 
+  dplyr::summarise(MMR.Mean = round(mean(MMR.Before, na.rm = TRUE)),
+                   Level.Mean = round(mean(Hero.Level)),
+                   Level.Median = median(Hero.Level),
+                   Match.Count = n(),
+                   Win.Count = sum(as.integer(Is.Winner)-1)
+                   
+                  )
+
+summary(repl_heroic.heroID.Group)
+```
+
+#Índice de Vitórias de Cada heroi
+
+```{r}
+heroID_mapID$ID <- as.factor(heroID_mapID$ID)
+repl_heroic.heroID.Group.Joined <- left_join(repl_heroic.heroID.Group, heroID_mapID, by = c("HeroID" = "ID"))
+repl_heroic.heroID.Group.Joined$Winrate = (repl_heroic.heroID.Group.Joined$Win.Count * 100) / repl_heroic.heroID.Group.Joined$Match.Count  
+
+ggplot(repl_heroic.heroID.Group.Joined, aes(x=Name, y=Winrate, fill = Group)) + 
+  geom_bar(stat = "identity", width = 0.5) + 
+  geom_text(aes(label = round(Winrate,digits = 1)), colour = "white", size = 2, hjust = 1) +
+  theme(axis.text.y = element_text(size=6)) +
+  scale_y_continuous(limits = c(0,100), breaks = seq(0,100,50)) + 
+  coord_flip() + 
+  facet_wrap(~SubGroup, scales = "free") +
+  theme_hc(bgcolor = "darkunica") +
+  scale_colour_hc("darkunica")
+
+
+```
+
+
+# Herói mais jogado por dia da semana
+
+```{r}
+   repl_heroic.Replay.Joined <- left_join(x = repl_heroic, y = replay)
+   repl_heroic.Replay.Joined <- left_join(x = repl_heroic.Replay.Joined, y = heroID_mapID, by = c("HeroID" = "ID"))
+   repl_heroic.Replay.Joined$Day.Week <- NULL
+   repl_heroic.Replay.Joined$Day.Week <- as.factor(weekdays(as.Date(repl_heroic.Replay.Joined$Timestamp..UTC., "%m/%d/%Y"),abbreviate = FALSE))
+   
+   levels(repl_heroic.Replay.Joined$Day.Week)
+   repl_heroic.Replay.Joined$Day.Week <- factor(repl_heroic.Replay.Joined$Day.Week, levels = c("Domingo", "Segunda Feira", "Terça Feira", "Quarta Feira", "Quinta Feira", "Sexta Feira", "Sábado"))
+   
+  
+```
+
+#Frequencia de Heroi por Dia da semana
+```{r}
+
+
+repl_heroic.Replay.Joined.Grouped.Day.Week <-  repl_heroic.Replay.Joined %>% group_by(Day.Week,Name) %>% summarise(n = n(),
+                                      MMR.mean = mean(MMR.Before, na.rm = TRUE),                                                Win.Count = sum(as.integer(Is.Winner)-1),
+                                      Win.Percentage = (Win.Count * 100) / n
+                             )
+
+ggplot(repl_heroic.Replay.Joined.Grouped.Day.Week, aes(x=Day.Week,y=Name)) +
+  geom_tile(aes(fill = Win.Percentage),
+     colour = "white") + scale_fill_gradient(low = "white",
+     high = "steelblue")
+
+
+```
+
+
+
+
+
+```{r}
+train.Team <- repl_heroic.Team[1:30000, 2:ncol(repl_heroic.Team)]
+#train$Time.Spent.Dead <- NULL
+
+test.Team <- repl_heroic.Team[30000:70000,2:ncol(repl_heroic.Team)]
+#test$Time.Spent.Dead <- NULL
+
+model.Single.Team <- glm(Is.Winner ~. , family=binomial(link='logit'),data=train.Team)
+#model.Team <- glm(Is.Winner ~.,family=binomial(link='logit'),data=repl_heroic.Team)
+summary(model.Single.Team)
+
+anova(model.Single.Team, test = "Chisq")
+
+fitted.results <- predict(model.Single.Team,newdata=test.Team,type='response')
+fitted.results <- ifelse(fitted.results > 0.5,1,0)
+
+misClasificError <- mean(fitted.results != test.Team$Is.Winner)
+print(paste('Accuracy',1-misClasificError))
+```
+
+
+
+
+
+
